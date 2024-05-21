@@ -3,13 +3,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
 from os import getenv
-from models.base_model import BaseModel
+from models.base_model import BaseModel, Base
 from models.user import User
 from models.place import Place
 from models.state import State
 from models.city import City
 from models.amenity import Amenity
 from models.review import Review
+
+
+classes = {"Amenity": Amenity, "City": City,
+           "Place": Place, "Review": Review, "State": State, "User": User}
 
 class DBStorage:
     """This is the DBStorage class"""
@@ -30,24 +34,15 @@ class DBStorage:
             Base.metadata.drop_all(self.__engine)
         
     def all(self, cls=None):
-        """ Query on the current database session depending of the class name (argument cls). """
-        objs_list = []
-        if cls:
-            if isinstance(cls, str):
-                try:
-                    cls = globals().get(cls)
-                except KeyError:
-                    pass
-            if issubclass(cls, Base):
-                objs_list = self.__session.query(cls).all()
-        else:
-            for subClass in Base.__subclasses__():
-                objs_list.extend(self.__session.query(subClass).all())
-        objs_dict = {}
-        for obj in objs_list:
-            key = "{}.{}".format(obj.__class__.__name__, obj.id)
-            objs_dict[key] = obj
-        return objs_dict
+        """query on the current database session"""
+        new_dict = {}
+        for clss in classes:
+            if cls is None or cls is classes[clss] or cls is clss:
+                objs = self.__session.query(classes[clss]).all()
+                for obj in objs:
+                    key = obj.__class__.__name__ + '.' + obj.id
+                    new_dict[key] = obj
+        return (new_dict)
             
     
     def new(self, obj):
@@ -69,3 +64,7 @@ class DBStorage:
         Session_factory = sessionmaker(bind=self.__engine, expire_on_commit=False)
         Session = scoped_session(Session_factory)
         self.__session = Session()
+
+    def close(self):
+        """ Remove the private session attribute"""
+        self.__session.remove()
